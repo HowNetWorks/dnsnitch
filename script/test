@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set -e
+
+TEST="lts-7 lts nightly"
+
+for test in ${TEST}; do
+    stack test --resolver=${test}
+done
