@@ -2,8 +2,10 @@
 
 set -e
 
-TEST="lts-7 lts nightly"
+RESOLVERS="lts nightly"
 
-for test in ${TEST}; do
-    stack test --resolver=${test}
+stack test
+
+for RESOLVER in ${RESOLVERS}; do
+    stack test --fast --resolver=${RESOLVER}
 done

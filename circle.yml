@@ -5,7 +5,8 @@ dependencies:
     - curl -sSL https://get.haskellstack.org/ | sudo sh
   override:
     - stack update
-    - stack build --only-dependencies
+    - stack test --only-dependencies
+    - stack test --only-dependencies --resolver=nightly
 
 test:
   override:
