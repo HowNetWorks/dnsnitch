@@ -1,4 +1,4 @@
-# dnsnitch
+# dnsnitch [![CircleCI](https://circleci.com/gh/HowNetWorks/dnsnitch.svg?style=svg)](https://circleci.com/gh/HowNetWorks/dnsnitch)
 
 ## Build & Run
 
