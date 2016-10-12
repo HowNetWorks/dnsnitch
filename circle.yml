@@ -3,7 +3,7 @@ dependencies:
     - "~/.stack/"
   pre:
     - curl -sSL https://get.haskellstack.org/ | sudo sh
-  post:
+  override:
     - stack update
     - stack build --only-dependencies
 
