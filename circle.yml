@@ -2,7 +2,7 @@ dependencies:
   cache_directories:
     - "~/.stack/"
   pre:
-    - curl -sSL https://get.haskellstack.org/ | sh sh
+    - curl -sSL https://get.haskellstack.org/ | sudo sh
   post:
     - stack update
     - stack build --only-dependencies
