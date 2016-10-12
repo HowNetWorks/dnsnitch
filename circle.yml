@@ -1,0 +1,13 @@
+dependencies:
+  cache_directories:
+    - "~/.stack/"
+  pre:
+    - curl -sSL https://get.haskellstack.org/ | sudo sh
+  override:
+    - stack update
+    - stack test --only-dependencies
+    - stack test --only-dependencies --resolver=nightly
+
+test:
+  override:
+    - ./script/test
