@@ -74,24 +74,28 @@ dnsLoop sock cache = do
     dnsLoop sock cache
 
   let
-    (DomainName qName) = question . head . questions $ query
+    qName = unDomainName . question . head . questions $ query
 
     -- Key used for caching. ByteString from DNS labels before keyword
     -- "dnstest". For example DNS query to
     -- "random.key.dnstest.example.com" will produce "random.key"
     -- key in cache
     cacheKey = BS.intercalate "." . takeWhile (/= "dnstest") $ qName
-    cacheValue = let
-      (DomainName labels) = addrToDomainName from
-      in BS.intercalate "." labels
+    cacheValue = addrToByteString Dot from
 
     -- DNS response will be CNAME pointing to name like
     -- 198-51-100-42.dnsresult.example.com
-    responseName = addrToDomainName from `mappend` (DomainName
-                   . map (\l -> if l == "dnstest" then "dnsresult" else l)
-                   . dropWhile (/= "dnstest")
-                   $ qName)
+    resultDomain = map (\l -> if l == "dnstest" then "dnsresult" else l)
+                   . dropWhile (/= "dnstest") $ qName
+    responseName = DomainName (addrToByteString Dash from : resultDomain)
 
+  when (length (unDomainName responseName) < 4) $ do
+    -- Response domainname should be at least four parts long
+    -- (<result>.dnsresult.example.com)
+    putStrLn $ "not dnstest query from " ++ show from ++ ": " ++ show query
+    dnsLoop sock cache
+
+  let
     responseData = IN_CNAME responseName
     dnsResponse = makeResponse query responseData
     dnsPacket = runPut . putMessage $ dnsResponse
@@ -218,6 +222,11 @@ instance Monoid DomainName where
 
 instance Show DomainName where
   show (DomainName labels) = intercalate "." . map Char8.unpack $ labels
+
+
+unDomainName :: DomainName -> [ByteString]
+unDomainName (DomainName labels) = labels
+
 
 instance Arbitrary DomainName where
   -- labelCount and labelLen are chosen so that the result is under
@@ -471,17 +480,26 @@ putRData (IN_AAAA (a1, a2, a3, a4)) = do
   putWord32be a4
 putRData (IN_UNKNOWN _ bytes) = putByteString bytes
 
--- | Convert SockAddr to DomainName
-addrToDomainName :: Socket.SockAddr -> DomainName
-addrToDomainName (Socket.SockAddrInet _ addr) = makeDomainName str
+
+data DotOrDash = Dot | Dash
+
+-- | Convert SockAddr to ByteString
+addrToByteString :: DotOrDash -> Socket.SockAddr -> ByteString
+addrToByteString dod (Socket.SockAddrInet _ addr) = Char8.pack str
   where
     (b1, b2, b3, b4) = Socket.hostAddressToTuple addr
-    str = printf "%d-%d-%d-%d" b1 b2 b3 b4
-addrToDomainName (Socket.SockAddrInet6 _ _ addr _) = makeDomainName str
+    str = case dod of
+      Dash -> printf "%d-%d-%d-%d" b1 b2 b3 b4
+      Dot  -> printf "%d.%d.%d.%d" b1 b2 b3 b4
+
+addrToByteString dod (Socket.SockAddrInet6 _ _ addr _) = Char8.pack str
   where
     (b1, b2, b3, b4, b5, b6, b7, b8) = Socket.hostAddress6ToTuple addr
-    str = printf "%x-%x-%x-%x-%x-%x-%x-%x" b1 b2 b3 b4 b5 b6 b7 b8
-addrToDomainName _ = error "Undefined type for addrToDomainName"
+    str = case dod of
+      Dash -> printf "%x-%x-%x-%x-%x-%x-%x-%x" b1 b2 b3 b4 b5 b6 b7 b8
+      Dot  -> printf "%x:%x:%x:%x:%x:%x:%x:%x" b1 b2 b3 b4 b5 b6 b7 b8
+
+addrToByteString _ _ = error "Undefined type for addrToByteString"
 
 
 -- | Split list
@@ -494,11 +512,9 @@ addrToDomainName _ = error "Undefined type for addrToDomainName"
 --
 splitWith :: (a -> Bool) -> [a] -> [[a]]
 splitWith _ [] = []
-splitWith pred' list =
-  let
+splitWith pred' list = first : splitWith pred' (drop 1 rest)
+  where
     (first, rest) = span pred' list
-  in
-    first : splitWith pred' (drop 1 rest)
 
 
 -- | Convert host name into DomainName
@@ -507,9 +523,9 @@ splitWith pred' list =
 -- this.is.test.example.com
 --
 makeDomainName :: String -> DomainName
-makeDomainName domainName =
-  let labels = map Char8.pack (splitWith (/='.') domainName)
-  in DomainName labels
+makeDomainName domainName = DomainName labels
+  where
+    labels = map Char8.pack (splitWith (/='.') domainName)
 
 
 -- | Repeat getter n times

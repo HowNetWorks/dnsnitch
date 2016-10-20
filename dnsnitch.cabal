@@ -27,6 +27,7 @@ library
                      , Dnsnitch.DNS
                      , Dnsnitch.HTTP
   build-depends:       base >= 4.7 && < 5
+                     , aeson
                      , bytestring
                      , cache
                      , cereal
