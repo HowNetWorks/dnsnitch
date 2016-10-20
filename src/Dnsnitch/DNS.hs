@@ -3,6 +3,7 @@
 
 module Dnsnitch.DNS ( dnsMain ) where
 
+import           Control.Concurrent        (forkIO)
 import           Control.Monad             (unless, when)
 
 import           Data.Bits                 (clearBit, setBit, shiftR, testBit,
@@ -48,40 +49,42 @@ dnsMain port' cache = do
   sock <- Socket.socket Socket.AF_INET Socket.Datagram Socket.defaultProtocol
   Socket.bind sock (Socket.SockAddrInet port 0)
 
-  putStrLn "Listening.."
+  putStrLn $ "Listening on " ++ show port
+  dnsLoop sock cache
+
+
+-- | Receive packet and fork process to handle it
+dnsLoop :: Socket.Socket -> Cache.DnsCache -> IO ()
+dnsLoop sock cache = do
+  packet <- Socket.recvFrom sock 65535
+  _ <- forkIO (dnsHandler sock cache packet)
   dnsLoop sock cache
 
 
 -- | This does stuff :)
-dnsLoop :: Socket.Socket -> Cache.DnsCache -> IO ()
-dnsLoop sock cache = do
-  (bs, from) <- Socket.recvFrom sock 65535
-  let request = runGet getMessage bs
+dnsHandler :: Socket.Socket -> Cache.DnsCache
+           -> (ByteString, Socket.SockAddr)
+           -> IO ()
+dnsHandler sock cache packet = do
+  let (bs, from) = packet
+      request = runGet getMessage bs
 
   when (isLeft request) $ do
     -- Error in parsing message
     let (Left err) = request
     putStrLn $ show from ++ ": " ++ head (lines err)
-    dnsLoop sock cache
+    return ()
 
   let (Right query) = request
-  putStrLn $ show from ++ ": " ++ show query
+      qRRType' = qRRType . head . questions $ query
 
-  let qRRType' = qRRType . head . questions $ query
   unless (qRRType' `elem` [A, AAAA]) $ do
     -- Unsuppoted RRType
     putStrLn $ show from ++": unsupported request type " ++ show qRRType'
-    dnsLoop sock cache
+    return ()
 
   let
     qName = unDomainName . question . head . questions $ query
-
-    -- Key used for caching. ByteString from DNS labels before keyword
-    -- "dnstest". For example DNS query to
-    -- "random.key.dnstest.example.com" will produce "random.key"
-    -- key in cache
-    cacheKey = BS.intercalate "." . takeWhile (/= "dnstest") $ qName
-    cacheValue = addrToByteString Dot from
 
     -- DNS response will be CNAME pointing to name like
     -- 198-51-100-42.dnsresult.example.com
@@ -93,7 +96,7 @@ dnsLoop sock cache = do
     -- Response domainname should be at least four parts long
     -- (<result>.dnsresult.example.com)
     putStrLn $ "not dnstest query from " ++ show from ++ ": " ++ show query
-    dnsLoop sock cache
+    return ()
 
   let
     responseData = IN_CNAME responseName
@@ -102,12 +105,19 @@ dnsLoop sock cache = do
 
   _ <- Socket.sendTo sock dnsPacket from
 
-  -- Cache only keys with minimum length to avoid cache poisoning
-  when (BS.length cacheKey >= 51) $ do
-    Cache.insert cache cacheKey cacheValue
-    putStrLn $ "Cache insert: " ++ show cacheKey ++ " " ++ show cacheValue
+  let
+    -- Key used for caching. ByteString from DNS labels before keyword
+    -- "dnstest". For example DNS query to
+    -- "random.key.dnstest.example.com" will produce "random.key"
+    -- key in cache
+    cacheKey = BS.intercalate "." . takeWhile (/= "dnstest") $ qName
+    cacheValue = addrToByteString Dot from
 
-  dnsLoop sock cache
+  -- Cache only keys with minimum length to avoid cache poisoning
+  when (BS.length cacheKey >= 51) $
+    Cache.insert cache cacheKey cacheValue
+
+  return ()
 
 
 -- | Produce DNS response message
