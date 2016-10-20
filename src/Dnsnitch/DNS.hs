@@ -45,7 +45,9 @@ import qualified Dnsnitch.Cache            as Cache
 dnsMain :: Int -> Cache.DnsCache -> IO ()
 dnsMain port cache = do
   let hints = Socket.defaultHints
-              { Socket.addrFlags = [Socket.AI_PASSIVE]
+              { Socket.addrFlags = [ Socket.AI_ADDRCONFIG
+                                   , Socket.AI_PASSIVE
+                                   ]
               , Socket.addrSocketType = Socket.Datagram
               }
 
@@ -63,6 +65,8 @@ dnsMain port cache = do
         (Socket.addrFamily addr)
         (Socket.addrSocketType addr)
         (Socket.addrProtocol addr)
+      when (Socket.addrFamily addr == Socket.AF_INET6) $
+        Socket.setSocketOption sock Socket.IPv6Only 1
       Socket.bind sock (Socket.addrAddress addr)
       putStrLn $ "Listening on " ++ show (Socket.addrAddress addr)
       dnsLoop sock cache
