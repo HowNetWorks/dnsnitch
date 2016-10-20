@@ -4,7 +4,7 @@
 module Dnsnitch.DNS ( dnsMain ) where
 
 import           Control.Concurrent        (forkIO)
-import           Control.Monad             (unless, when)
+import           Control.Monad             (forM, unless, when)
 
 import           Data.Bits                 (clearBit, setBit, shiftR, testBit,
                                             (.&.))
@@ -43,14 +43,29 @@ import qualified Dnsnitch.Cache            as Cache
 -- DNS requests.
 --
 dnsMain :: Int -> Cache.DnsCache -> IO ()
-dnsMain port' cache = do
-  let port = fromIntegral port'
+dnsMain port cache = do
+  let hints = Socket.defaultHints
+              { Socket.addrFlags = [Socket.AI_PASSIVE]
+              , Socket.addrSocketType = Socket.Datagram
+              }
 
-  sock <- Socket.socket Socket.AF_INET Socket.Datagram Socket.defaultProtocol
-  Socket.bind sock (Socket.SockAddrInet port 0)
+  addrs <- Socket.getAddrInfo (Just hints) Nothing (Just . show $ port)
 
-  putStrLn $ "Listening on " ++ show port
-  dnsLoop sock cache
+  -- Leave one listener on foreground and fork rest of the listeners
+  -- to own thread
+  _ <- forM (tail addrs) $ \addr -> forkIO $ listenOn addr
+  listenOn (head addrs)
+
+  where
+    listenOn :: Socket.AddrInfo -> IO ()
+    listenOn addr = do
+      sock <- Socket.socket
+        (Socket.addrFamily addr)
+        (Socket.addrSocketType addr)
+        (Socket.addrProtocol addr)
+      Socket.bind sock (Socket.addrAddress addr)
+      putStrLn $ "Listening on " ++ show (Socket.addrAddress addr)
+      dnsLoop sock cache
 
 
 -- | Receive packet and fork process to handle it
