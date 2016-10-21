@@ -40,6 +40,7 @@ lookupIp cache key = do
 httpMain :: Int -> Cache.DnsCache -> IO ()
 httpMain port cache = scotty port $
   get "/:key" $ do
+    setHeader "Access-Control-Allow-Origin" "*"
     key <- param "key"
     value <- liftIO $ lookupIp cache (textToBS key)
     case value of
