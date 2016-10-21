@@ -122,15 +122,15 @@ dnsHandler sock cache packet = do
                    . dropWhile (/= "dnstest") $ qName
     responseName = DomainName (addrToByteString Dash from : resultDomain)
 
-  when (length (unDomainName responseName) < 4) $ do
-    -- Response domainname should be at least four parts long
-    -- (<result>.dnsresult.example.com)
+  when (length (unDomainName responseName) < 3) $ do
+    -- Response domainname should be at least three parts long
+    -- (dnsresult.example.com)
     putStrLn $ "not dnstest query from " ++ show from ++ ": " ++ show query
     endThread
 
   let
     responseData = IN_CNAME responseName
-    dnsResponse = makeResponse query responseData
+    dnsResponse = makeResponse query responseData []
     dnsPacket = runPut . putMessage $ dnsResponse
 
   _ <- Socket.sendTo sock dnsPacket from
@@ -159,8 +159,16 @@ makeNSResponse query =
   where
     qName = unDomainName . question . head . questions $ query
     responseName = DomainName (dropWhile (/= "dnstest") qName)
+    additionalName = DomainName
+      . map (\l -> if l == "dnstest" then "dnsresult" else l)
+      . unDomainName $ responseName
     responseData = IN_NS responseName
-    dnsResponse = makeResponse query responseData
+    additionalRR = RR
+      { name = responseName
+      , ttl = 10
+      , rdata = IN_CNAME additionalName
+      }
+    dnsResponse = makeResponse query responseData [additionalRR]
 
 
 -- | Produce DNS response message
@@ -168,8 +176,8 @@ makeNSResponse query =
 -- Given DNS Query and response RData, produces new DNS Response
 -- Message
 --
-makeResponse :: Message -> RData -> Message
-makeResponse query responseData = responseMsg
+makeResponse :: Message -> RData -> [RR] -> Message
+makeResponse query responseData additionalRR = responseMsg
   where
     id' = msgId query
     (question':_) = questions query
@@ -180,7 +188,7 @@ makeResponse query responseData = responseMsg
       , questions = [question']
       , answers = [responseRR]
       , authority = []
-      , additional = []
+      , additional = additionalRR
       }
 
 
