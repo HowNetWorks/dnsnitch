@@ -357,8 +357,8 @@ getRRType = do
   typ <- getWord16be
   cls <- getWord16be
   case lookup (cls, typ) rrtypes of
-    Just match -> return match
-    Nothing    -> return $ UnknownRRType cls typ
+    Just match -> return $! match
+    Nothing    -> return $! UnknownRRType cls typ
 
 
 -- | Put Resource Record Type
@@ -496,7 +496,7 @@ getRData AAAA  = do
 getRData typ = do
   len <- remaining
   bytes <- getBytes len
-  return $ IN_UNKNOWN typ bytes
+  return $! IN_UNKNOWN typ bytes
 
 
 putRData :: Putter RData
