@@ -4,7 +4,7 @@
 module Dnsnitch.DNS ( dnsMain ) where
 
 import           Control.Concurrent        (forkIO)
-import           Control.Monad             (forM, unless, when)
+import           Control.Monad             (forM, unless, when, forever)
 
 import           Data.Bits                 (clearBit, setBit, shiftR, testBit,
                                             (.&.))
@@ -74,10 +74,10 @@ dnsMain port cache = do
 
 -- | Receive packet and fork process to handle it
 dnsLoop :: Socket.Socket -> Cache.DnsCache -> IO ()
-dnsLoop sock cache = do
+dnsLoop sock cache = forever $ do
   packet <- Socket.recvFrom sock 65535
-  _ <- forkIO (dnsHandler sock cache packet)
-  dnsLoop sock cache
+  _ <- forkIO $ dnsHandler sock cache packet
+  return ()
 
 
 -- | This does stuff :)
