@@ -3,8 +3,8 @@
 
 module Dnsnitch.DNS ( dnsMain ) where
 
-import           Control.Concurrent        (forkIO)
-import           Control.Monad             (forM, unless, when, forever)
+import           Control.Concurrent        (forkIO, killThread, myThreadId)
+import           Control.Monad             (forM, forever, unless, when)
 
 import           Data.Bits                 (clearBit, setBit, shiftR, testBit,
                                             (.&.))
@@ -13,6 +13,7 @@ import qualified Data.ByteString           as BS
 import qualified Data.ByteString.Char8     as Char8 (pack, unpack)
 import           Data.Either               (isLeft)
 import           Data.List                 (intercalate)
+import           Data.Maybe                (fromJust, isNothing)
 import           Data.Tuple                (swap)
 import           Data.Word                 (Word16, Word32)
 
@@ -92,15 +93,25 @@ dnsHandler sock cache packet = do
     -- Error in parsing message
     let (Left err) = request
     putStrLn $ show from ++ ": " ++ head (lines err)
-    return ()
+    endThread
 
   let (Right query) = request
       qRRType' = qRRType . head . questions $ query
 
+  when (qRRType' == NS) $ do
+    let responseMsg = makeNSResponse query
+    when (isNothing responseMsg) $ do
+      putStrLn $ "not proper NS query from " ++ show from ++ ": " ++ show query
+      endThread
+
+    let dnsPacket = runPut . putMessage . fromJust $ responseMsg
+    _ <- Socket.sendTo sock dnsPacket from
+    endThread
+
   unless (qRRType' `elem` [A, AAAA]) $ do
     -- Unsuppoted RRType
-    putStrLn $ show from ++": unsupported request type in" ++ show query
-    return ()
+    putStrLn $ show from ++ ": unsupported request type in " ++ show query
+    endThread
 
   let
     qName = unDomainName . question . head . questions $ query
@@ -115,7 +126,7 @@ dnsHandler sock cache packet = do
     -- Response domainname should be at least four parts long
     -- (<result>.dnsresult.example.com)
     putStrLn $ "not dnstest query from " ++ show from ++ ": " ++ show query
-    return ()
+    endThread
 
   let
     responseData = IN_CNAME responseName
@@ -136,7 +147,20 @@ dnsHandler sock cache packet = do
   when (BS.length cacheKey >= 51) $
     Cache.insert cache cacheKey cacheValue
 
-  return ()
+
+-- | Produce DNS NS response message
+--
+-- Given DNS query, produce NS response message
+makeNSResponse :: Message -> Maybe Message
+makeNSResponse query =
+  if length (unDomainName responseName) >= 3
+  then Just dnsResponse
+  else Nothing
+  where
+    qName = unDomainName . question . head . questions $ query
+    responseName = DomainName (dropWhile (/= "dnstest") qName)
+    responseData = IN_NS responseName
+    dnsResponse = makeResponse query responseData
 
 
 -- | Produce DNS response message
@@ -457,6 +481,7 @@ putRR :: Putter RR
 putRR record = do
   let rrtype' = case rdata record of
         (IN_A _)           -> A
+        (IN_NS _)          -> NS
         (IN_AAAA _)        -> AAAA
         (IN_CNAME _)       -> CNAME
         (IN_UNKNOWN typ _) -> typ
@@ -475,6 +500,7 @@ putRR record = do
 data RData
   = IN_CNAME DomainName
   | IN_A HostAddress
+  | IN_NS DomainName
   | IN_AAAA HostAddress6
   | IN_UNKNOWN RRType ByteString
   deriving (Show, Eq)
@@ -483,6 +509,7 @@ instance Arbitrary RData where
   arbitrary = oneof
     [ fmap IN_CNAME arbitrary
     , fmap IN_A arbitrary
+    , fmap IN_NS arbitrary
     , fmap IN_AAAA arbitrary
     ]
 
@@ -491,6 +518,7 @@ instance Arbitrary RData where
 --
 getRData :: RRType -> Get RData
 getRData A     = fmap IN_A getWord32be
+getRData NS    = fmap IN_NS getDomainName
 getRData CNAME = fmap IN_CNAME getDomainName
 getRData AAAA  = do
   [a1, a2, a3, a4] <- getTimes (4::Int) getWord32be
@@ -504,6 +532,7 @@ getRData typ = do
 putRData :: Putter RData
 putRData (IN_CNAME cname) = putDomainName cname
 putRData (IN_A addr)      = putWord32be addr
+putRData (IN_NS ns)       = putDomainName ns
 putRData (IN_AAAA (a1, a2, a3, a4)) = do
   putWord32be a1
   putWord32be a2
@@ -572,3 +601,10 @@ getTimes n getter = go [] n
     go as m = do
       bs <- getter
       go (bs:as) (m-1)
+
+
+-- | Terminate (kill) current thread
+--
+endThread :: IO ()
+endThread = myThreadId >>= killThread
+{-# INLINE endThread #-}
