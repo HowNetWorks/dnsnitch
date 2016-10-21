@@ -99,7 +99,7 @@ dnsHandler sock cache packet = do
 
   unless (qRRType' `elem` [A, AAAA]) $ do
     -- Unsuppoted RRType
-    putStrLn $ show from ++": unsupported request type " ++ show qRRType'
+    putStrLn $ show from ++": unsupported request type in" ++ show query
     return ()
 
   let
@@ -319,6 +319,7 @@ putDomainName (DomainName labels) = do
 --
 data RRType
   = A
+  | NS
   | CNAME
   | AAAA
   -- ^ https://tools.ietf.org/html/rfc3596
@@ -335,6 +336,7 @@ instance Arbitrary RRType where
 rrtypes :: [((Word16, Word16), RRType)]
 rrtypes =
   [ ((1,  1), A)
+  , ((1,  2), NS)
   , ((1,  5), CNAME)
   , ((1, 28), AAAA)
   ]
