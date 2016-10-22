@@ -11,6 +11,7 @@ import           Data.Bits                 (clearBit, setBit, shiftR, testBit,
 import           Data.ByteString           (ByteString)
 import qualified Data.ByteString           as BS
 import qualified Data.ByteString.Char8     as Char8 (pack, unpack)
+import qualified Data.Char                 as Char
 import           Data.Either               (isLeft)
 import           Data.List                 (intercalate)
 import           Data.Maybe                (fromJust, isNothing)
@@ -118,8 +119,8 @@ dnsHandler sock cache packet = do
 
     -- DNS response will be CNAME pointing to name like
     -- 198-51-100-42.dnsresult.example.com
-    resultDomain = map (\l -> if l == "dnstest" then "dnsresult" else l)
-                   . dropWhile (/= "dnstest") $ qName
+    resultDomain = map (\l -> if isDnstest l then "dnsresult" else l)
+                   . dropWhile (not . isDnstest) $ qName
     responseName = DomainName (addrToByteString Dash from : resultDomain)
 
   when (length (unDomainName responseName) < 3) $ do
@@ -140,7 +141,7 @@ dnsHandler sock cache packet = do
     -- "dnstest". For example DNS query to
     -- "random.key.dnstest.example.com" will produce "random.key"
     -- key in cache
-    cacheKey = BS.intercalate "." . takeWhile (/= "dnstest") $ qName
+    cacheKey = BS.intercalate "." . takeWhile (not . isDnstest) $ qName
     cacheValue = addrToByteString Dot from
 
   -- Cache only keys with minimum length to avoid cache poisoning
@@ -158,9 +159,9 @@ makeNSResponse query =
   else Nothing
   where
     qName = unDomainName . question . head . questions $ query
-    responseName = DomainName (dropWhile (/= "dnstest") qName)
+    responseName = DomainName (dropWhile (not . isDnstest) qName)
     additionalName = DomainName
-      . map (\l -> if l == "dnstest" then "dnsresult" else l)
+      . map (\l -> if isDnstest l then "dnsresult" else l)
       . unDomainName $ responseName
     responseData = IN_NS responseName
     additionalRR = RR
@@ -568,6 +569,21 @@ addrToByteString dod (Socket.SockAddrInet6 _ _ addr _) = Char8.pack str
       Dot  -> printf "%x:%x:%x:%x:%x:%x:%x:%x" b1 b2 b3 b4 b5 b6 b7 b8
 
 addrToByteString _ _ = error "Undefined type for addrToByteString"
+
+
+-- | Case insensitive comparison for word "dnstest"
+--
+-- >>> isDnstest "dnstest"
+-- True
+--
+-- >>> isDnstest "DNStEST"
+-- True
+--
+-- >>> isDnstest ""
+-- False
+--
+isDnstest :: ByteString -> Bool
+isDnstest str = "dnstest" == map Char.toLower (Char8.unpack str)
 
 
 -- | Split list
