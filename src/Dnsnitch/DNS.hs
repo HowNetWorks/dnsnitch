@@ -145,7 +145,7 @@ dnsHandler sock cache packet = do
 
   -- Cache only keys with minimum length to avoid cache poisoning
   when (BS.length cacheKey >= 51) $
-    Cache.insert cache cacheKey cacheValue
+    Cache.append cache cacheKey cacheValue
 
 
 -- | Produce DNS NS response message

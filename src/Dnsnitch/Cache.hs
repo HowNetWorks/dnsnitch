@@ -1,19 +1,30 @@
-module Dnsnitch.Cache
-  ( DnsCache
+module Dnsnitch.Cache (
+  -- * Creating a cache
+    DnsCache
   , newCache
-  , Cache.insert
-  , Cache.lookup
+
+  -- * Append items
+  , append
+
+  -- * Querying
+  , lookup
   )
 where
+
+import           Prelude            hiding (lookup)
 
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Monad      (forever)
 
 import           Data.ByteString    (ByteString)
 import qualified Data.Cache         as Cache
+import           Data.Hashable      (Hashable)
+import           Data.Set           (Set)
+import qualified Data.Set           as Set
+
 import           System.Clock       (TimeSpec (..))
 
-type DnsCache = Cache.Cache ByteString ByteString
+type DnsCache = Cache.Cache ByteString (Set.Set ByteString)
 
 
 -- | Create new DNS Cache
@@ -30,6 +41,25 @@ newCache seconds = do
     s = fromIntegral seconds
     expire = TimeSpec { sec = s, nsec = 0 }
 
+
+-- | Append new element into value
+--
+append :: (Eq k, Hashable k, Ord v) => Cache.Cache k (Set v) -> k -> v -> IO ()
+append cache key value = do
+  match <- Cache.lookup cache key
+  case match of
+    Nothing  -> Cache.insert cache key (Set.singleton value)
+    Just set -> Cache.insert cache key (Set.insert value set)
+
+
+-- | Lookup elements
+--
+lookup :: (Eq k, Hashable k) => Cache.Cache k (Set v) -> k -> IO (Set v)
+lookup cache key = do
+  values <- Cache.lookup cache key
+  case values of
+    Nothing  -> return Set.empty
+    Just set -> return set
 
 -- | Purge cache periodically
 --

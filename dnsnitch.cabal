@@ -32,6 +32,8 @@ library
                      , cache
                      , cereal
                      , clock
+                     , containers
+                     , hashable
                      , network
                      , scotty
                      , text
