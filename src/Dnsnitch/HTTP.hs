@@ -13,11 +13,14 @@ import           Data.Text.Lazy          (Text)
 import qualified Data.Text.Lazy          as Text
 import qualified Data.Text.Lazy.Encoding as Text
 
+import qualified Network.Socket          as Socket
+
 import           GHC.Generics
 
 import           Web.Scotty
 
 import qualified Dnsnitch.Cache          as Cache
+import           Dnsnitch.Utils
 
 
 data DnsResult = DnsResult
@@ -31,9 +34,18 @@ instance ToJSON DnsResult
 lookupIp :: Cache.DnsCache -> ByteString -> IO [DnsResult]
 lookupIp cache key = do
   values <- Cache.lookup cache key
-  return $ map toDnsResult (Set.toList values)
+  mapM toDnsResult (Set.toList values)
   where
-    toDnsResult value = DnsResult { ip = bsToText value, name = Nothing }
+    toDnsResult value = do
+      let ipAddr = addrToText Dot value
+      hostName <- resolveName value
+      return $! DnsResult { ip = ipAddr, name = hostName }
+
+
+resolveName :: Socket.SockAddr -> IO (Maybe Text)
+resolveName addr = do
+  (hostName, _) <- Socket.getNameInfo [] True False addr
+  return $ fmap Text.pack hostName
 
 
 httpMain :: Int -> Cache.DnsCache -> IO ()

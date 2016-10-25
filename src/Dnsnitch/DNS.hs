@@ -143,11 +143,10 @@ dnsHandler sock cache packet = do
     -- "random.key.dnstest.example.com" will produce "random.key"
     -- key in cache
     cacheKey = BS.intercalate "." . takeWhile (not . isDnstest) $ qName
-    cacheValue = addrToByteString Dot from
 
   -- Cache only keys with minimum length to avoid cache poisoning
   when (BS.length cacheKey >= 51) $
-    Cache.append cache cacheKey cacheValue
+    Cache.append cache cacheKey from
 
 
 -- | Produce DNS NS response message

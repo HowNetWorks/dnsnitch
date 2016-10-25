@@ -22,9 +22,11 @@ import           Data.Hashable      (Hashable)
 import           Data.Set           (Set)
 import qualified Data.Set           as Set
 
+import qualified Network.Socket     as Socket
+
 import           System.Clock       (TimeSpec (..))
 
-type DnsCache = Cache.Cache ByteString (Set.Set ByteString)
+type DnsCache = Cache.Cache ByteString (Set.Set Socket.SockAddr)
 
 
 -- | Create new DNS Cache
