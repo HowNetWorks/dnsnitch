@@ -3,6 +3,7 @@
 
 module Dnsnitch.HTTP where
 
+import           Control.Exception       (IOException, catch)
 import           Control.Monad.IO.Class  (liftIO)
 
 import           Data.Aeson              (ToJSON)
@@ -44,7 +45,13 @@ lookupIp cache key = do
 
 resolveName :: Socket.SockAddr -> IO (Maybe Text)
 resolveName addr = do
-  (hostName, _) <- Socket.getNameInfo [] True False addr
+  -- Force getNameInfo to throw exception if hostname is can't be
+  -- resolved and return Nothing. Otherwise getNameInfo would return
+  -- IP address as String.
+  (hostName, _) <- catch
+    (Socket.getNameInfo [Socket.NI_NAMEREQD] True False addr)
+    (\e -> let _ = e :: IOException
+           in return (Nothing, Nothing))
   return $ fmap Text.pack hostName
 
 
