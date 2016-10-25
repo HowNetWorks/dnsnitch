@@ -37,6 +37,7 @@ import           Test.QuickCheck           (Arbitrary (..), Gen, choose,
                                             elements, oneof, vectorOf)
 
 import qualified Dnsnitch.Cache            as Cache
+import           Dnsnitch.Utils
 
 
 -- | Entry point for DNS
@@ -548,27 +549,6 @@ putRData (IN_AAAA (a1, a2, a3, a4)) = do
   putWord32be a3
   putWord32be a4
 putRData (IN_UNKNOWN _ bytes) = putByteString bytes
-
-
-data DotOrDash = Dot | Dash
-
--- | Convert SockAddr to ByteString
-addrToByteString :: DotOrDash -> Socket.SockAddr -> ByteString
-addrToByteString dod (Socket.SockAddrInet _ addr) = Char8.pack str
-  where
-    (b1, b2, b3, b4) = Socket.hostAddressToTuple addr
-    str = case dod of
-      Dash -> printf "%d-%d-%d-%d" b1 b2 b3 b4
-      Dot  -> printf "%d.%d.%d.%d" b1 b2 b3 b4
-
-addrToByteString dod (Socket.SockAddrInet6 _ _ addr _) = Char8.pack str
-  where
-    (b1, b2, b3, b4, b5, b6, b7, b8) = Socket.hostAddress6ToTuple addr
-    str = case dod of
-      Dash -> printf "%x-%x-%x-%x-%x-%x-%x-%x" b1 b2 b3 b4 b5 b6 b7 b8
-      Dot  -> printf "%x:%x:%x:%x:%x:%x:%x:%x" b1 b2 b3 b4 b5 b6 b7 b8
-
-addrToByteString _ _ = error "Undefined type for addrToByteString"
 
 
 -- | Case insensitive comparison for word "dnstest"
