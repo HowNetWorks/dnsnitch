@@ -183,7 +183,7 @@ makeResponse query responseData additionalRR = responseMsg
     id' = msgId query
     (question':_) = questions query
     (Question qName _) = question'
-    responseRR = RR { name = qName, ttl = 10, rdata = responseData }
+    responseRR = RR { name = qName, ttl = 1, rdata = responseData }
     responseMsg = Message
       { msgId = id'
       , questions = [question']
