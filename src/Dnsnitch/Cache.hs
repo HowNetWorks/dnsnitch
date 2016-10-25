@@ -54,12 +54,17 @@ append cache key value = do
 
 -- | Lookup elements
 --
+-- Lookup will delete found key from cache
+--
 lookup :: (Eq k, Hashable k) => Cache.Cache k (Set v) -> k -> IO (Set v)
 lookup cache key = do
   values <- Cache.lookup cache key
   case values of
     Nothing  -> return Set.empty
-    Just set -> return set
+    Just set -> do
+      Cache.delete cache key
+      return set
+
 
 -- | Purge cache periodically
 --
