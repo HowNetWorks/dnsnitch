@@ -10,4 +10,4 @@ dependencies:
 
 test:
   override:
-    - ./script/test
+    - ./scripts/test
