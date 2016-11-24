@@ -23,8 +23,6 @@ import qualified Network.Socket            as Socket hiding (recv, recvFrom,
                                                       send, sendTo)
 import qualified Network.Socket.ByteString as Socket
 
-import           Text.Printf               (printf)
-
 -- From cereal
 import           Data.Serialize            (Get, Putter, getBytes, getWord16be,
                                             getWord32be, getWord8, isolate,
