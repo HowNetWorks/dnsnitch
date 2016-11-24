@@ -6,7 +6,7 @@ module Dnsnitch.HTTP where
 import           Control.Exception       (IOException, catch)
 import           Control.Monad.IO.Class  (liftIO)
 
-import           Data.Aeson              (ToJSON)
+import           Data.Aeson              (ToJSON (..), object, (.=))
 import           Data.ByteString         (ByteString)
 import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Set                as Set
@@ -22,6 +22,13 @@ import           Web.Scotty
 
 import qualified Dnsnitch.Cache          as Cache
 import           Dnsnitch.Utils
+
+
+data Result = Result [DnsResult]
+
+instance ToJSON Result where
+  toJSON (Result dnsResults) =
+        object ["data" .= dnsResults]
 
 
 data DnsResult = DnsResult
@@ -61,7 +68,7 @@ httpMain port cache = scotty port $
     setHeader "Access-Control-Allow-Origin" "*"
     key <- param "key"
     values <- liftIO $ lookupIp cache (textToBS key)
-    json values
+    json (Result values)
 
 
 -- | Convert Lazy Text to Strict UTF8 ByteString
