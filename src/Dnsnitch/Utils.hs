@@ -4,11 +4,16 @@ module Dnsnitch.Utils
   ( DotOrDash(..)
   , addrToText
   , addrToByteString
+  -- Convert between Text and ByteString
+  , textToBS
+  , bsToText
+  --
+  , splitWith
   )
 where
 
 import           Data.ByteString         (ByteString)
-import           Data.ByteString.Lazy    (toStrict)
+import           Data.ByteString.Lazy    (fromStrict, toStrict)
 import           Data.Text.Lazy          (Text)
 import qualified Data.Text.Lazy          as Text
 import qualified Data.Text.Lazy.Encoding as Text
@@ -45,3 +50,38 @@ addrToText _ _ = error "Undefined type for addrToText"
 -- | Convert SockAddr to ByteString
 addrToByteString :: DotOrDash -> Socket.SockAddr -> ByteString
 addrToByteString dod addr = toStrict (Text.encodeUtf8 (addrToText dod addr))
+
+
+-- | Convert Lazy Text to Strict UTF8 ByteString
+--
+-- >>> :set -XOverloadedStrings
+-- >>> "test" == (textToBS . bsToText) "test"
+-- True
+--
+textToBS :: Text.Text -> ByteString
+textToBS = toStrict . Text.encodeUtf8
+
+
+-- | Convert Strict UTF8 ByteString to Lazy ByteString
+--
+-- >>> :set -XOverloadedStrings
+-- >>> "test" == (bsToText . textToBS) "test"
+-- True
+--
+bsToText :: ByteString -> Text.Text
+bsToText = Text.decodeUtf8 . fromStrict
+
+
+-- | Split list
+--
+-- >>> splitWith (/='.') "1.2.3.4"
+-- ["1","2","3","4"]
+--
+-- >>> splitWith (/='.') "abcd.efgh."
+-- ["abcd","efgh"]
+--
+splitWith :: (a -> Bool) -> [a] -> [[a]]
+splitWith _ [] = []
+splitWith pred' list = first : splitWith pred' (drop 1 rest)
+  where
+    (first, rest) = span pred' list

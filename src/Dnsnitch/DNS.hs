@@ -288,6 +288,17 @@ unDomainName :: DomainName -> [ByteString]
 unDomainName (DomainName labels) = labels
 
 
+-- | Convert host name into DomainName
+--
+-- >>> makeDomainName "this.is.test.example.com"
+-- this.is.test.example.com
+--
+makeDomainName :: String -> DomainName
+makeDomainName domainName = DomainName labels
+  where
+    labels = map Char8.pack (splitWith (/='.') domainName)
+
+
 instance Arbitrary DomainName where
   -- labelCount and labelLen are chosen so that the result is under
   -- 255 bytes.
@@ -550,6 +561,7 @@ putRData (IN_UNKNOWN _ bytes) = putByteString bytes
 
 -- | Case insensitive comparison for word "dnstest"
 --
+-- >>> :set -XOverloadedStrings
 -- >>> isDnstest "dnstest"
 -- True
 --
@@ -561,32 +573,6 @@ putRData (IN_UNKNOWN _ bytes) = putByteString bytes
 --
 isDnstest :: ByteString -> Bool
 isDnstest str = "dnstest" == map Char.toLower (Char8.unpack str)
-
-
--- | Split list
---
--- >>> splitWith (/='.') "1.2.3.4"
--- ["1","2","3","4"]
---
--- >>> splitWith (/='.') "abcd.efgh."
--- ["abcd","efgh"]
---
-splitWith :: (a -> Bool) -> [a] -> [[a]]
-splitWith _ [] = []
-splitWith pred' list = first : splitWith pred' (drop 1 rest)
-  where
-    (first, rest) = span pred' list
-
-
--- | Convert host name into DomainName
---
--- >>> makeDomainName "this.is.test.example.com"
--- this.is.test.example.com
---
-makeDomainName :: String -> DomainName
-makeDomainName domainName = DomainName labels
-  where
-    labels = map Char8.pack (splitWith (/='.') domainName)
 
 
 -- | Repeat getter n times
