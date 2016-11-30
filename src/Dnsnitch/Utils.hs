@@ -4,6 +4,7 @@ module Dnsnitch.Utils
   ( DotOrDash(..)
   , addrToText
   , addrToByteString
+  , unsafeToSockAddr
   -- Convert between Text and ByteString
   , textToBS
   , bsToText
@@ -13,6 +14,8 @@ module Dnsnitch.Utils
   , iso8601
   )
 where
+
+import           Control.Exception       (IOException, catch)
 
 import           Data.ByteString         (ByteString)
 import           Data.ByteString.Lazy    (fromStrict, toStrict)
@@ -24,6 +27,8 @@ import           Data.Time.Format        (defaultTimeLocale, formatTime)
 import qualified Network.Socket          as Socket
 
 import           Text.Printf             (printf)
+
+import           System.IO.Unsafe        (unsafePerformIO)
 
 data DotOrDash = Dot | Dash
 
@@ -55,6 +60,39 @@ addrToText _ _ = error "Undefined type for addrToText"
 -- | Convert SockAddr to ByteString
 addrToByteString :: DotOrDash -> Socket.SockAddr -> ByteString
 addrToByteString dod addr = toStrict (Text.encodeUtf8 (addrToText dod addr))
+
+
+-- | Convert IP address from String into SockAddr
+--
+-- >>> unsafeToSockAddr "192.0.2.42"
+-- Right 192.0.2.42:0
+--
+-- >>> unsafeToSockAddr "2001:db8:cafe::1:2:3:4"
+-- Right [2001:db8:cafe::1:2:3:4]:0
+--
+-- >>> unsafeToSockAddr "hello world"
+-- Left ...
+--
+unsafeToSockAddr :: String -> Either String Socket.SockAddr
+unsafeToSockAddr ipAddr =
+  let value = unsafePerformIO (execIO ipAddr)
+  in
+    case value of
+      Left err -> Left err
+      Right addr ->
+        case Socket.addrAddress addr of
+          ip4@Socket.SockAddrInet{}  -> Right ip4
+          ip6@Socket.SockAddrInet6{} -> Right ip6
+          _                          -> Left "Unsupported SockAddr instance"
+  where
+    execIO :: String -> IO (Either String Socket.AddrInfo)
+    execIO str =
+      catch (do
+                addr:_ <- Socket.getAddrInfo Nothing (Just str) Nothing
+                return (Right addr))
+      (\e -> let _ = e :: IOException
+             in return $ Left (show e))
+{-# NOINLINE unsafeToSockAddr #-}
 
 
 -- | Convert Lazy Text to Strict UTF8 ByteString
