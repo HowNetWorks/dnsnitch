@@ -8,7 +8,6 @@ import           Control.Monad.IO.Class (liftIO)
 
 import           Data.Aeson             (ToJSON (..), object, (.=))
 import           Data.ByteString        (ByteString)
-import           Data.Maybe             (fromMaybe)
 import qualified Data.Set               as Set
 import           Data.Text.Lazy         (Text)
 import qualified Data.Text.Lazy         as Text
@@ -50,12 +49,19 @@ httpMain port cache = scotty port $
 
     -- IP address from HTTP connection
     req <- request
-    let requestIp = addrToText Dot (remoteHost req)
+    let requestIp = remoteHost req
 
     -- IP address from X-Forwarded-For header
     xffHdr <- header "X-Forwarded-For"
-    let xff = fmap (Text.takeWhile (/=',')) xffHdr
-    let clientIP = fromMaybe requestIp xff
+    let xff = case xffHdr of
+          Just hdr -> do
+            let str = Text.unpack hdr
+            unsafeToSockAddr (takeWhile (/=',') str)
+          Nothing -> Left ""
+
+    let clientIP = case xff of
+          Right addr -> addr
+          Left _ -> requestIp
 
     time <- liftIO getCurrentTime
     liftIO . TextIO.putStrLn $ logLine time clientIP values
@@ -64,11 +70,12 @@ httpMain port cache = scotty port $
     json (Result dnsResults)
 
 
-logLine :: UTCTime -> Text -> [Socket.SockAddr] -> Text
-logLine time client dns =
+logLine :: UTCTime -> Socket.SockAddr -> [Socket.SockAddr] -> Text
+logLine time clientIP dns =
   Text.concat [ isoTime, " dnsnitch-http: ", client, " [", dnsList, "]" ]
   where
     isoTime = iso8601 time
+    client = addrToText Dot (anonymizeIP clientIP)
     dnsList = Text.intercalate ", " (map (addrToText Dot) dns)
 
 
