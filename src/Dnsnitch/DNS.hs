@@ -274,7 +274,7 @@ putMessage msg = do
 -- | Domain Name (list of DNS labels)
 --
 -- Implemented as a list of strict ByteStrings.
-data DomainName = DomainName [ByteString] deriving Eq
+newtype DomainName = DomainName [ByteString] deriving Eq
 
 instance Monoid DomainName where
   mempty = DomainName mempty
