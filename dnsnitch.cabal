@@ -39,6 +39,7 @@ library
                      , scotty
                      , text
                      , time
+                     , wai
                      , QuickCheck
 
 executable dnsnitch
