@@ -4,6 +4,7 @@ module Dnsnitch.Utils
   ( DotOrDash(..)
   , addrToText
   , addrToByteString
+  , anonymizeIP
   , unsafeToSockAddr
   -- Convert between Text and ByteString
   , textToBS
@@ -60,6 +61,38 @@ addrToText _ _ = error "Undefined type for addrToText"
 -- | Convert SockAddr to ByteString
 addrToByteString :: DotOrDash -> Socket.SockAddr -> ByteString
 addrToByteString dod addr = toStrict (Text.encodeUtf8 (addrToText dod addr))
+
+
+-- | Anonymize address
+--
+-- This uses same strategy as Google Analytics[0] where the last octet
+-- of IPv4 addresses and the last 80 bits of IPv6 addresses are set to
+-- zeros.
+--
+-- >>> let (Right addr) = unsafeToSockAddr "192.0.2.42"
+-- >>> anonymizeIP addr
+-- 192.0.2.0:0
+--
+-- >>> let (Right addr6) = unsafeToSockAddr "2001:db8:cafe::1:2:3:4"
+-- >>> anonymizeIP addr6
+-- [2001:db8:cafe::]:0
+--
+-- [0]: https://support.google.com/analytics/answer/2763052
+--
+anonymizeIP :: Socket.SockAddr -> Socket.SockAddr
+anonymizeIP (Socket.SockAddrInet port addr) =
+  Socket.SockAddrInet port anonymizedAddr
+  where
+    (b1, b2, b3, _) = Socket.hostAddressToTuple addr
+    anonymizedAddr = Socket.tupleToHostAddress (b1, b2, b3, 0)
+
+anonymizeIP (Socket.SockAddrInet6 port flow addr scope) =
+  Socket.SockAddrInet6 port flow anonymizedAddr scope
+  where
+    (b1, b2, b3, _, _, _, _, _) = Socket.hostAddress6ToTuple addr
+    anonymizedAddr = Socket.tupleToHostAddress6 (b1, b2, b3, 0, 0, 0, 0, 0)
+
+anonymizeIP _ = error "Undefined type for anonymizeIP"
 
 
 -- | Convert IP address from String into SockAddr
