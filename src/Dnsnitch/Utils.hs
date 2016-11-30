@@ -9,6 +9,8 @@ module Dnsnitch.Utils
   , bsToText
   --
   , splitWith
+  --
+  , iso8601
   )
 where
 
@@ -17,7 +19,10 @@ import           Data.ByteString.Lazy    (fromStrict, toStrict)
 import           Data.Text.Lazy          (Text)
 import qualified Data.Text.Lazy          as Text
 import qualified Data.Text.Lazy.Encoding as Text
+import           Data.Time.Clock         (UTCTime)
+import           Data.Time.Format        (defaultTimeLocale, formatTime)
 import qualified Network.Socket          as Socket
+
 import           Text.Printf             (printf)
 
 data DotOrDash = Dot | Dash
@@ -85,3 +90,16 @@ splitWith _ [] = []
 splitWith pred' list = first : splitWith pred' (drop 1 rest)
   where
     (first, rest) = span pred' list
+
+
+-- | Format time to ISO8601
+--
+-- The output is "YYYY-MM-DDTHH:MM:SS.sssZ"
+--
+iso8601 :: UTCTime -> Text
+iso8601 utc =
+  -- YYYY-MM-DDTHH:MM:SS.ssssss..."
+  -- \_____ 23 chars ______/
+  Text.pack $ take 23 str ++ "Z"
+  where
+    str = formatTime defaultTimeLocale "%FT%T%Q" utc

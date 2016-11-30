@@ -38,6 +38,7 @@ library
                      , network
                      , scotty
                      , text
+                     , time
                      , QuickCheck
 
 executable dnsnitch
