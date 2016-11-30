@@ -73,7 +73,7 @@ addrToByteString dod addr = toStrict (Text.encodeUtf8 (addrToText dod addr))
 -- >>> anonymizeIP addr
 -- 192.0.2.0:0
 --
--- >>> let (Right addr6) = unsafeToSockAddr "2001:db8:cafe::1:2:3:4"
+-- >>> let (Right addr6) = unsafeToSockAddr "2001:db8:cafe::1:2:3"
 -- >>> anonymizeIP addr6
 -- [2001:db8:cafe::]:0
 --
@@ -100,8 +100,8 @@ anonymizeIP _ = error "Undefined type for anonymizeIP"
 -- >>> unsafeToSockAddr "192.0.2.42"
 -- Right 192.0.2.42:0
 --
--- >>> unsafeToSockAddr "2001:db8:cafe::1:2:3:4"
--- Right [2001:db8:cafe::1:2:3:4]:0
+-- >>> unsafeToSockAddr "2001:db8:cafe::1:2:3"
+-- Right [2001:db8:cafe::1:2:3]:0
 --
 -- >>> unsafeToSockAddr "hello world"
 -- Left ...
