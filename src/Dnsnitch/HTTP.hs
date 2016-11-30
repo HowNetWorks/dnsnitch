@@ -26,7 +26,7 @@ import qualified Dnsnitch.Cache         as Cache
 import           Dnsnitch.Utils
 
 
-data Result = Result [DnsResult]
+newtype Result = Result [DnsResult]
 
 instance ToJSON Result where
   toJSON (Result dnsResults) =
