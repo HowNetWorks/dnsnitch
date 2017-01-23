@@ -16,17 +16,17 @@ import           Prelude            hiding (lookup)
 import           Control.Concurrent (forkIO, threadDelay)
 import           Control.Monad      (forever)
 
-import           Data.ByteString    (ByteString)
 import qualified Data.Cache         as Cache
 import           Data.Hashable      (Hashable)
 import           Data.Set           (Set)
 import qualified Data.Set           as Set
+import           Data.Text          (Text)
 
 import qualified Network.Socket     as Socket
 
 import           System.Clock       (TimeSpec (..))
 
-type DnsCache = Cache.Cache ByteString (Set.Set Socket.SockAddr)
+type DnsCache = Cache.Cache Text (Set.Set Socket.SockAddr)
 
 
 -- | Create new DNS Cache
@@ -77,6 +77,6 @@ lookup cache key = do
 -- and not get ran if DNS requests flood the cache with inserts.
 --
 purgeTimer :: Integer -> DnsCache -> IO ()
-purgeTimer seconds cache = forever $ do
+purgeTimer seconds cache = forever $ do
     threadDelay (1000000 * fromIntegral seconds)
     Cache.purgeExpired cache

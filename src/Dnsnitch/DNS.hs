@@ -15,6 +15,8 @@ import qualified Data.Char                 as Char
 import           Data.Either               (isLeft)
 import           Data.List                 (intercalate)
 import           Data.Maybe                (fromJust, isNothing)
+import           Data.Text                 (toCaseFold)
+import           Data.Text.Encoding        (decodeUtf8')
 import           Data.Tuple                (swap)
 import           Data.Word                 (Word16, Word32)
 
@@ -144,7 +146,9 @@ dnsHandler sock cache packet = do
 
   -- Cache only keys with minimum length to avoid cache poisoning
   when (BS.length cacheKey >= 51) $
-    Cache.append cache cacheKey from
+    case decodeUtf8' cacheKey of
+      Left _    -> return ()
+      Right key -> Cache.append cache (toCaseFold key) from
 
 
 -- | Produce DNS NS response message

@@ -9,8 +9,10 @@ import           Control.Monad.IO.Class (liftIO)
 import           Data.Aeson             (ToJSON (..), object, (.=))
 import           Data.ByteString        (ByteString)
 import qualified Data.Set               as Set
+import qualified Data.Text              as Text (toCaseFold)
+import           Data.Text.Encoding     (decodeUtf8')
 import           Data.Text.Lazy         (Text)
-import qualified Data.Text.Lazy         as Text
+import qualified Data.Text.Lazy         as Text hiding (toCaseFold)
 import qualified Data.Text.Lazy.IO      as TextIO
 import           Data.Time.Clock        (UTCTime (..), getCurrentTime)
 
@@ -61,7 +63,7 @@ httpMain port cache = scotty port $
 
     let clientIP = case xff of
           Right addr -> addr
-          Left _ -> requestIp
+          Left _     -> requestIp
 
     time <- liftIO getCurrentTime
     liftIO . TextIO.putStrLn $ logLine time clientIP values
@@ -80,9 +82,12 @@ logLine time clientIP dns =
 
 
 lookupIp :: Cache.DnsCache -> ByteString -> IO [Socket.SockAddr]
-lookupIp cache key = do
-  values <- Cache.lookup cache key
-  return (Set.toList values)
+lookupIp cache key =
+  case decodeUtf8' key of
+    Left _     -> return []
+    Right key' -> do
+      values <- Cache.lookup cache (Text.toCaseFold key')
+      return (Set.toList values)
 
 
 toDnsResult :: Socket.SockAddr -> IO DnsResult
